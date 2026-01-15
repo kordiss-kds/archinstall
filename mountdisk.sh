@@ -1,45 +1,49 @@
 #!/bin/bash
 
-# Переменные
 DISK="/dev/nvme0n1"
 OPTS="noatime,compress=zstd:3,ssd,discard=async,space_cache=v2"
 
-echo "--- 1. Проверка Swap ---"
-# Активируем, если еще не включен (ошибки скрываем)
+echo "--- 1. Подготовка (Swap и корень диска) ---"
 swapon "${DISK}p2" 2>/dev/null
-
-echo "--- 2. Создание подтомов Btrfs ---"
-# Временный монтаж для создания структуры
 mount "${DISK}p3" /mnt
-btrfs subvolume create /mnt/@
-btrfs subvolume create /mnt/@home
-btrfs subvolume create /mnt/@snapshots
-btrfs subvolume create /mnt/@var
-btrfs subvolume create /mnt/@log
-btrfs subvolume create /mnt/@cache
+
+# Создаем подтома, если они еще не созданы (ошибки игнорируем, если уже есть)
+btrfs subvolume create /mnt/@ 2>/dev/null
+btrfs subvolume create /mnt/@home 2>/dev/null
+btrfs subvolume create /mnt/@snapshots 2>/dev/null
+btrfs subvolume create /mnt/@var 2>/dev/null
+btrfs subvolume create /mnt/@log 2>/dev/null
+btrfs subvolume create /mnt/@cache 2>/dev/null
+
+# Размонтируем корень диска, чтобы начать чистое монтирование подтомов
 umount /mnt
 
-echo "--- 3. Монтирование системы ---"
-# Монтируем корень системы
+echo "--- 2. Чистое монтирование структуры ---"
+
+# Сначала основной подтом системы
 mount -o "$OPTS,subvol=@" "${DISK}p3" /mnt
 
-# Создаем точки монтирования
-mkdir -p /mnt/{boot,home,.snapshots,var,var/log,var/cache}
+# Создаем точки монтирования (папки)
+mkdir -p /mnt/{boot,home,.snapshots,var}
 
-# Монтируем загрузочный раздел (EFI)
+# Монтируем EFI и Home
 mount "${DISK}p1" /mnt/boot
-
-# Монтируем остальные подтома
 mount -o "$OPTS,subvol=@home" "${DISK}p3" /mnt/home
 mount -o "$OPTS,subvol=@snapshots" "${DISK}p3" /mnt/.snapshots
+
+# ВАЖНО: Сначала монтируем @var
 mount -o "$OPTS,subvol=@var" "${DISK}p3" /mnt/var
+
+# ТЕПЕРЬ создаем папки внутри примонтированного @var
+mkdir -p /mnt/var/{log,cache}
+
+# И монтируем в них соответствующие подтома
 mount -o "$OPTS,subvol=@log" "${DISK}p3" /mnt/var/log
 mount -o "$OPTS,subvol=@cache" "${DISK}p3" /mnt/var/cache
 
-echo "--- 4. Настройка атрибутов (NoCoW) ---"
-# Отключаем Copy-on-Write для логов и кэша
+echo "--- 3. Установка атрибутов ---"
 chattr +C /mnt/var/log
 chattr +C /mnt/var/cache
 
-echo "--- Готово! Структура диска собрана в /mnt ---"
+echo "--- Готово! Проверяй дерево монтирования: ---"
 lsblk "${DISK}"
