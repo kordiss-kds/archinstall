@@ -17,7 +17,7 @@ pacstrap -K /mnt \
   base base-devel \
   linux-cachyos linux-cachyos-headers linux-firmware \
   amd-ucode btrfs-progs \
-  nano networkmanager sudo \
+  nano vim networkmanager sudo \
   snapper snap-pac grub-btrfs
 
 echo "--- 3. Генерация fstab ---"
