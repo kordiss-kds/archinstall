@@ -68,8 +68,8 @@ sed -i 's/# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers
 # 8. Установка твоего набора ПО (USB, Архивы, Разработка, Консоль)
 echo "--- 8. Установка дополнительного ПО (USB, Архивы, Git, Разработка) ---"
 pacman -S --noconfirm --needed \
-    udevil udisks2 \
-    p7zip unrar zip unzip lrzip lz4 paimon-tools squashfs-tools \
+    udiskie udisks2 \
+    p7zip unrar zip unzip lrzip lz4 mtools dosfstools squashfs-tools \
     base-devel git bash-completion pacman-contrib \
     vim neovim micro htop wget curl
 
