@@ -1,29 +1,22 @@
 #!/bin/bash
 
-# 1. Настройка репозиториев CachyOS внутри системы
-echo "--- 1. Настройка репозиториев CachyOS ---"
+# --- 1. Настройка репозиториев CachyOS и оптимизация pacman ---
+echo "--- 1. Настройка репозиториев CachyOS и ускорение ---"
 curl -O https://mirror.cachyos.org/cachyos-repo.tar.xz
 tar xvf cachyos-repo.tar.xz && cd cachyos-repo
 ./cachyos-repo.sh
 cd ..
 
-# 2. Тонкая настройка pacman.conf для v3 и параллельной загрузки
-echo "--- 2. Оптимизация pacman.conf (v3 + Parallel) ---"
-# Включаем 5 потоков
+# Включаем 5 потоков загрузки и "ILoveCandy"
 sed -i 's/#ParallelDownloads = 5/ParallelDownloads = 5/' /etc/pacman.conf
-# Добавляем цвет и аккуратный вывод
 sed -i 's/#Color/Color\nILoveCandy/' /etc/pacman.conf
 
-# Проверяем, что v3 репозитории в приоритете (в начале списка)
-# Если скрипт CachyOS их уже добавил, мы просто убеждаемся, что они активны
-# (Обычно скрипт CachyOS делает это сам, но ручной контроль не помешает)
-
-# 3. Обновление и установка драйверов NVIDIA
-echo "--- 3. Установка NVIDIA Open Driver (RTX 3060) ---"
+# --- 2. Установка драйверов и ядра ---
+echo "--- 2. Установка NVIDIA Open Driver (RTX 3060) и Microcode ---"
 pacman -Syu --noconfirm nvidia-open-cachyos nvidia-utils lib32-nvidia-utils amd-ucode
 
-# 4. Локализация и Имя хоста
-echo "--- 4. Настройка локализации и Hostname ---"
+# --- 3. Локализация и Hostname ---
+echo "--- 3. Настройка локализации ---"
 read -p "Введите имя вашего компьютера (hostname): " MY_HOSTNAME
 echo "$MY_HOSTNAME" > /etc/hostname
 
@@ -36,8 +29,8 @@ echo "LANG=ru_RU.UTF-8" > /etc/locale.conf
 echo "KEYMAP=ruwin_alt_sh-UTF-8" > /etc/vconsole.conf
 echo "FONT=cyr-sun16" >> /etc/vconsole.conf
 
-# 5. Настройка Snapper
-echo "--- 5. Настройка Snapper ---"
+# --- 4. Настройка Snapper (Btrfs) ---
+echo "--- 4. Настройка Snapper ---"
 umount -l /.snapshots 2>/dev/null
 rm -rf /.snapshots
 snapper -c root create-config /
@@ -45,16 +38,18 @@ rm -rf /.snapshots
 mkdir /.snapshots
 mount -a
 
-# 6. Установка и настройка GRUB
-echo "--- 6. Установка загрузчика GRUB ---"
+# --- 5. Установка загрузчика GRUB ---
+echo "--- 5. Установка GRUB и поддержка снимков ---"
 pacman -S --noconfirm grub efibootmgr grub-btrfs
 grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
 systemctl enable grub-btrfsd
 grub-mkconfig -o /boot/grub/grub.cfg
 
-# 7. Пользователи, Сеть и Sudo
-echo "--- 7. Создание пользователя и пароли ---"
+# --- 6. Пользователи, Sudo и Сеть ---
+echo "--- 6. Настройка доступа и сети ---"
 systemctl enable NetworkManager
+systemctl enable systemd-timesyncd
+
 echo "УСТАНОВКА ПАРОЛЯ ДЛЯ ROOT"
 passwd
 
@@ -65,23 +60,34 @@ passwd $USERNAME
 
 sed -i 's/# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers
 
-# 8. Установка твоего набора ПО (USB, Архивы, Разработка, Консоль)
-echo "--- 8. Установка дополнительного ПО (USB, Архивы, Git, Разработка) ---"
+# --- 7. Установка ПО и Английские папки пользователя ---
+echo "--- 7. Установка ПО (USB, Архивы, Git, Разработка) ---"
 pacman -S --noconfirm --needed \
-    udiskie udisks2 \
+    xdg-user-dirs udiskie udisks2 \
     p7zip unrar zip unzip lrzip lz4 mtools dosfstools squashfs-tools \
     base-devel git bash-completion pacman-contrib \
     vim neovim micro htop wget curl
 
-# 9. Настройка автоматической очистки кэша пакмана (оставляем только 2 версии)
-echo "--- 9. Настройка очистки кэша ---"
+# Создаем английские папки (Desktop, Downloads и т.д.)
+sudo -u $USERNAME LC_ALL=C xdg-user-dirs-update --force
+
+# --- 8. Звук и Bluetooth ---
+echo "--- 8. Настройка Pipewire и Bluetooth ---"
+pacman -S --noconfirm --needed \
+    pipewire pipewire-pulse pipewire-alsa pipewire-jack \
+    wireplumber bluez bluez-utils
+
+systemctl enable bluetooth
 systemctl enable paccache.timer
 
+# --- 9. Финальная сборка образа ядра ---
+echo "--- 9. Пересборка образов ядра (mkinitcpio) ---"
+mkinitcpio -P
+
 echo "--------------------------------------------------------"
-echo "ВСЕ ГОТОВО!"
-echo "Драйвер NVIDIA v3 установлен, Snapper настроен,"
-echo "Доп. утилиты и Git готовы к работе."
-echo "1. Введите 'exit'"
-echo "2. Введите 'umount -R /mnt'"
-echo "3. Введите 'reboot'"
+echo "УСТАНОВКА ЗАВЕРШЕНА УСПЕШНО!"
+echo "Теперь:"
+echo "1. exit"
+echo "2. umount -R /mnt"
+echo "3. reboot"
 echo "--------------------------------------------------------"
