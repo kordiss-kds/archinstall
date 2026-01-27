@@ -1,17 +1,8 @@
 #!/bin/bash
-set -e
 
-echo "=== 1. ПОДГОТОВКА ОКРУЖЕНИЯ LIVE-ISO ==="
-# Убираем возможные блокировки базы данных
-sudo rm -f /var/lib/pacman/db.lck
-
-# Включаем параллельную загрузку
-sudo sed -i 's/#ParallelDownloads = 5/ParallelDownloads = 5/' /etc/pacman.conf
-
-echo "=== 2. ДОБАВЛЕНИЕ РЕПОЗИТОРИЕВ CACHYOS ==="
-# Импортируем ключи CachyOS напрямую, чтобы pacman не ругался
-sudo pacman-key --recv-keys F3B607488DB35974
-sudo pacman-key --lsign-key F3B607488DB35974
+echo "--- 1. Ускорение загрузки (5 потоков) ---"
+# Включаем параллельную загрузку в конфиге pacman живой системы
+sed -i 's/#ParallelDownloads = 5/ParallelDownloads = 5/' /etc/pacman.conf
 
 echo "--- 2. Добавление репозиториев CachyOS в Live-ISO ---"
 curl -O https://mirror.cachyos.org/cachyos-repo.tar.xz
@@ -25,9 +16,6 @@ cd cachyos-repo
 sudo ./cachyos-repo.sh
 sed -i 's/#ParallelDownloads = 5/ParallelDownloads = 5/' /etc/pacman.conf
 cd ..
-echo "=== 3. ОБНОВЛЕНИЕ БАЗЫ ДАННЫХ ==="
-# Это проверит доступность базы. Если тут ошибка — значит проблема в конфиге.
-sudo pacman -Sy
 
 echo "=== 4. УСТАНОВКА СИСТЕМЫ НА SSD (PACSTRAP) ==="
 # Создаем папку кэша на SSD
