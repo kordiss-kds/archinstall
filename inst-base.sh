@@ -1,40 +1,37 @@
 #!/bin/bash
-# install_base.sh — Установка базы с кэшированием на SSD (2026)
 set -e
 
-# --- КОНФИГУРАЦИЯ ---
-UCODE="amd-ucode" # Замени на intel-ucode, если процессор Intel
+echo "=== 1. ОЧИСТКА RAM И ПОДГОТОВКА КЛЮЧЕЙ ==="
+# Очищаем кэш в оперативной памяти Live-ISO
+sudo pacman -Scc --noconfirm
 
-echo "=== ШАГ 2: ПОДГОТОВКА И УСТАНОВКА БАЗЫ ==="
-
-# 1. Ускорение pacman в Live-ISO
-echo "Ускоряем загрузку (5 потоков)..."
+# Ускоряем загрузку
 sudo sed -i 's/#ParallelDownloads = 5/ParallelDownloads = 5/' /etc/pacman.conf
 
-# 2. Подготовка кэша на SSD
-# Это критически важный момент, чтобы не забить оперативную память
-echo "Создаю директорию кэша на SSD..."
+# Добавляем репозиторий CachyOS в Live-систему
+curl -O https://mirror.cachyos.org/cachyos-repo.tar.xz
+tar xvf cachyos-repo.tar.xz
+cd cachyos-repo
+sudo ./cachyos-repo.sh
+cd ..
+
+echo "=== 2. ПОДГОТОВКА КЭША НА SSD ==="
+# Создаем директорию на SSD, чтобы пакеты НЕ качались в оперативку
 mkdir -p /mnt/var/cache/pacman/pkg
 
-# 3. Установка базы через pacstrap
-# Используем флаг --cachedir, чтобы все пакеты качались сразу на диск
-echo "Запускаю pacstrap (кэширование на SSD)..."
-pacstrap /mnt base base-devel linux-cachyos linux-cachyos-headers linux-firmware git nano networkmanager $UCODE --cachedir /mnt/var/cache/pacman/pkg
+echo "=== 3. УСТАНОВКА БАЗОВОЙ СИСТЕМЫ (PACSTRAP) ==="
+# -K инициализирует новые ключи в системе
+# --cachedir перенаправляет загрузку на SSD
+pacstrap -K /mnt base base-devel linux-cachyos linux-cachyos-headers linux-firmware cachyos-keyring git nano networkmanager amd-ucode --cachedir /mnt/var/cache/pacman/pkg
 
-echo "=== ШАГ 3: ГЕНЕРАЦИЯ FSTAB ==="
-
-# 4. Генерация fstab
-echo "Генерирую /etc/fstab..."
+echo "=== 4. ГЕНЕРАЦИЯ FSTAB ==="
 genfstab -U /mnt >> /mnt/etc/fstab
 
-# 5. Проверка записи swapfile в fstab
+# Проверка записи swapfile в fstab
 if ! grep -q "/swap/swapfile" /mnt/etc/fstab; then
     echo "/swap/swapfile  none  swap  defaults,pri=-2  0 0" >> /mnt/etc/fstab
 fi
 
 echo "-------------------------------------------------"
-echo "ГОТОВО! Система установлена на SSD."
-echo "Проверь точки монтирования: cat /mnt/etc/fstab"
-echo ""
-echo "Теперь входи в систему для финальной настройки:"
-echo "arch-chroot /mnt"
+echo "БАЗА УСПЕШНО УСТАНОВЛЕНА!"
+echo "Теперь можно входить: arch-chroot /mnt"
