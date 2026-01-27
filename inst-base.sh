@@ -1,37 +1,51 @@
 #!/bin/bash
 set -e
 
-echo "=== 1. ОЧИСТКА RAM И ПОДГОТОВКА КЛЮЧЕЙ ==="
-# Очищаем кэш в оперативной памяти Live-ISO
-sudo pacman -Scc --noconfirm
+echo "=== 1. ПОДГОТОВКА ОКРУЖЕНИЯ LIVE-ISO ==="
+# Убираем возможные блокировки базы данных
+sudo rm -f /var/lib/pacman/db.lck
 
-# Ускоряем загрузку
+# Включаем параллельную загрузку
 sudo sed -i 's/#ParallelDownloads = 5/ParallelDownloads = 5/' /etc/pacman.conf
 
-# Добавляем репозиторий CachyOS в Live-систему
+echo "=== 2. ДОБАВЛЕНИЕ РЕПОЗИТОРИЕВ CACHYOS ==="
+# Импортируем ключи CachyOS напрямую, чтобы pacman не ругался
+sudo pacman-key --recv-keys F3B607488DB35974
+sudo pacman-key --lsign-key F3B607488DB35974
+
+echo "--- 2. Добавление репозиториев CachyOS в Live-ISO ---"
 curl -O https://mirror.cachyos.org/cachyos-repo.tar.xz
 tar xvf cachyos-repo.tar.xz
 cd cachyos-repo
-sudo ./cachyos-repo.sh
-cd ..
 
-echo "=== 2. ПОДГОТОВКА КЭША НА SSD ==="
-# Создаем директорию на SSD, чтобы пакеты НЕ качались в оперативку
+# Запускаем скрипт CachyOS.
+# Флаг автоматизации обычно зависит от скрипта, но мы прогоним его установку.
+# ВНИМАНИЕ: Скрипт CachyOS может сам обновить pacman.conf, 
+# поэтому мы повторно включим потоки после него.
+sudo ./cachyos-repo.sh
+sed -i 's/#ParallelDownloads = 5/ParallelDownloads = 5/' /etc/pacman.conf
+cd ..
+echo "=== 3. ОБНОВЛЕНИЕ БАЗЫ ДАННЫХ ==="
+# Это проверит доступность базы. Если тут ошибка — значит проблема в конфиге.
+sudo pacman -Sy
+
+echo "=== 4. УСТАНОВКА СИСТЕМЫ НА SSD (PACSTRAP) ==="
+# Создаем папку кэша на SSD
 mkdir -p /mnt/var/cache/pacman/pkg
 
-echo "=== 3. УСТАНОВКА БАЗОВОЙ СИСТЕМЫ (PACSTRAP) ==="
-# -K инициализирует новые ключи в системе
-# --cachedir перенаправляет загрузку на SSD
+# Установка базы. -K создаст новые ключи внутри системы.
+# Используем --cachedir, чтобы не забить оперативку.
 pacstrap -K /mnt base base-devel linux-cachyos linux-cachyos-headers linux-firmware cachyos-keyring git nano networkmanager amd-ucode --cachedir /mnt/var/cache/pacman/pkg
 
-echo "=== 4. ГЕНЕРАЦИЯ FSTAB ==="
+echo "=== 5. ГЕНЕРАЦИЯ FSTAB ==="
 genfstab -U /mnt >> /mnt/etc/fstab
 
-# Проверка записи swapfile в fstab
+# Проверка swapfile
 if ! grep -q "/swap/swapfile" /mnt/etc/fstab; then
     echo "/swap/swapfile  none  swap  defaults,pri=-2  0 0" >> /mnt/etc/fstab
 fi
 
 echo "-------------------------------------------------"
-echo "БАЗА УСПЕШНО УСТАНОВЛЕНА!"
-echo "Теперь можно входить: arch-chroot /mnt"
+echo "БАЗА УСТАНОВЛЕНА! Проверь наличие команд:"
+echo "Введи: arch-chroot /mnt ls /usr/bin/less"
+echo "Если путь найден — всё супер, заходи в chroot!"
