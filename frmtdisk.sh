@@ -47,7 +47,7 @@ mount -o $MOUNT_OPTS,subvol=@home "$ROOT_PART" /mnt/home
 mount -o $MOUNT_OPTS,subvol=.snapshots "$ROOT_PART" /mnt/.snapshots
 
 # МОНТИРУЕМ СВОП БЕЗ СЖАТИЯ И COW
-mount -o nocompress,nodatacow,noatime,subvol=@swap "$ROOT_PART" /mnt/swap
+mount -o compress=no,nodatacow,noatime,subvol=@swap "$ROOT_PART" /mnt/swap
 mount "$EFI_PART" /mnt/boot/efi
 
 # 5. Создание Swap-файла
